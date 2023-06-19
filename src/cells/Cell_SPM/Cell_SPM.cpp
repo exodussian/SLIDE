@@ -119,7 +119,7 @@ Status Cell_SPM::setCurrent(double Inew, bool checkV, bool print)
   return status;
 }
 
-bool Cell_SPM::getCSurf(double &cps, double &cns, bool print)
+bool Cell_SPM::getCSurf()
 {
   /*
    * Calculates the surface concentration at each particle.
@@ -133,14 +133,14 @@ bool Cell_SPM::getCSurf(double &cps, double &cns, bool print)
    * cns 	surface li-concentration at the negative particle [mol m-3]
    */
 
-  const auto [Dpt, Dnt] = calcDiffConstant();
+  const auto Dt = calcDiffConstant();
   const auto [i_app, jp, jn] = calcMolarFlux(); //!< current density, molar flux on the pos/neg particle
 
-  std::tie(cps, cns) = calcSurfaceConcentration(jp, jn, Dpt, Dnt);
+  const auto cs = calcSurfaceConcentration(ValuePair{ jp, jn }, Dt);
 
   //!< check if the surface concentration is within the allowed range
   //!< 	0 < cp < Cmaxpos  &&  0 < cn < Cmaxneg
-  const auto flag = !(cps <= 0 || cns <= 0 || cps >= Cmaxpos || cns >= Cmaxneg);
+  const auto flag = !(cs.pos <= 0 || cs.neg <= 0 || cs.pos >= Cmaxpos || cs.neg >= Cmaxneg);
 
   return flag;
 }
@@ -166,7 +166,7 @@ void Cell_SPM::getC(double cp[], double cn[]) noexcept
   using settings::nch;
 
   //!< Calculate the diffusion constant at the battery temperature using an Arrhenius relation
-  const auto [Dpt, Dnt] = calcDiffConstant();
+  const auto Dt = calcDiffConstant();
 
   //!< Calculate the molar flux on the surfaces
   const auto [i_app, jp, jn] = calcMolarFlux(); //!< current density, molar flux on the pos/neg particle
@@ -181,8 +181,8 @@ void Cell_SPM::getC(double cp[], double cn[]) noexcept
       cpt += M->Cp[i][j] * st.zp(j);
       cnt += M->Cn[i][j] * st.zn(j);
     }
-    cp[i] = cpt + M->Dp[i] * jp / Dpt;
-    cn[i] = cnt + M->Dn[i] * jn / Dnt;
+    cp[i] = cpt + M->Dp[i] * jp / Dt.pos;
+    cn[i] = cnt + M->Dn[i] * jn / Dt.neg;
   }
 
   //!< Calculate the concentration at centre node using the boundary condition (the concentration gradient at the centre has to be 0 due to symmetry)
@@ -193,8 +193,8 @@ void Cell_SPM::getC(double cp[], double cn[]) noexcept
     cpt += M->Cc[i] * cp[i];
     cnt += M->Cc[i] * cn[i];
   }
-  cp[nch + 1] = (-1.0 / 2.0) * (cpt + jp * geo.Rp / Dpt);
-  cn[nch + 1] = (-1.0 / 2.0) * (cnt + jn * geo.Rn / Dnt);
+  cp[nch + 1] = (-1.0 / 2.0) * (cpt + jp * geo.Rp / Dt.pos);
+  cn[nch + 1] = (-1.0 / 2.0) * (cnt + jn * geo.Rn / Dt.neg);
 }
 
 double Cell_SPM::getOCV()
@@ -297,8 +297,8 @@ double Cell_SPM::V()
     const auto OCV = (OCV_p - OCV_n + entropic_effect);
 
     const double Vnow = OCV + overpotential - getRdc() * I(); //
-    st.V() = Vnow; 
-    Vcell_valid = true;                            //!< we now have the most up to date value stored
+    st.V() = Vnow;
+    Vcell_valid = true; //!< we now have the most up to date value stored
   }
 
   return st.V();

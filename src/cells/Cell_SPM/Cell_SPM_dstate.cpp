@@ -40,16 +40,16 @@ void Cell_SPM::dState_diffusion(bool print, State_SPM &d_st)
 
   const auto nch = st.nch;
 
-  auto [Dpt, Dnt] = calcDiffConstant();
+  const auto Dt = calcDiffConstant();
   auto [i_app, jp, jn] = calcMolarFlux(); //!< current density, molar flux on the pos/neg particle
 
   //!< Calculate the effect of the main li-reaction on the (transformed) concentration
   for (size_t j = 0; j < nch; j++)
-    d_st.zp(j) = (Dpt * M->Ap[j] * st.zp(j) + M->Bp[j] * jp); //!< dz/dt = D * A * z + B * j
+    d_st.zp(j) = (Dt.pos * M->Ap[j] * st.zp(j) + M->Bp[j] * jp); //!< dz/dt = D * A * z + B * j
 
   //!< loop for each row of the matrix-vector product A * z
-  for (size_t j = 0; j < nch; j++)                            //!< A is diagonal, so the array M->A has only the diagonal elements
-    d_st.zn(j) = (Dnt * M->An[j] * st.zn(j) + M->Bn[j] * jn); //!< dz/dt = D * A * z + B * j
+  for (size_t j = 0; j < nch; j++)                               //!< A is diagonal, so the array M->A has only the diagonal elements
+    d_st.zn(j) = (Dt.neg * M->An[j] * st.zn(j) + M->Bn[j] * jn); //!< dz/dt = D * A * z + B * j
 
   d_st.SOC() += -I() / (Cap() * 3600); //!< dSOC state of charge
 }
@@ -70,9 +70,9 @@ void Cell_SPM::dState_thermal(bool print, double &dQgen)
    */
 
   //!< Calculcate the lithium fractions at the surface of the particles
-  auto [Dpt, Dnt] = calcDiffConstant();
+  const auto Dt = calcDiffConstant();
   auto [i_app, jp, jn] = calcMolarFlux(); //!< current density, molar flux on the pos/neg particle
-  auto [cps, cns] = calcSurfaceConcentration(jp, jn, Dpt, Dnt);
+  auto [cps, cns] = calcSurfaceConcentration(ValuePair<>{ jp, jn }, Dt);
 
   //!< check if the surface concentration is within the allowed range
   //!< 	0 < cp < Cmaxpos

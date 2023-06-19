@@ -9,13 +9,22 @@
 
 #pragma once
 
-struct DataStorage
+#include <tuple>
+#include <vector>
+
+template <typename... Funcs>
+class DataStorage
 {
-  enum Index : size_t //!< Index variables for:
+public:
+  DataStorage(Funcs... funcs) : funcs_(std::make_tuple(funcs...)) {}
+
+  template <typename T>
+  void save(const T &su)
   {
-    i_I,
-    i_SOC,
-    i_T, //!< cell temperature [K]
-    N_states,
-  };
+    (std::apply([&](auto func) { data_.push_back(func(su)); }, funcs_), ...);
+  }
+
+private:
+  std::tuple<Funcs...> funcs_;
+  std::vector<double> data_;
 };
